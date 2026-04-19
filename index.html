@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Mission ninja – Validation des réponses</title>
+  <meta name="description" content="Validation des réponses pour un jeu de piste sur mobile.">
+  <style>
+    :root {
+      --bg: #0b1220;
+      --bg-soft: #111827;
+      --panel: rgba(17, 24, 39, 0.92);
+      --panel-2: #1f2937;
+      --text: #f3f4f6;
+      --muted: #cbd5e1;
+      --border: #334155;
+      --accent: #38bdf8;
+      --success: #22c55e;
+      --error: #ef4444;
+      --gold: #facc15;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --max-width: 760px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, Ubuntu, "Helvetica Neue", Arial, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(56, 189, 248, 0.10), transparent 28%),
+        linear-gradient(180deg, #08111d 0%, #0b1220 100%);
+      color: var(--text);
+    }
+
+    .container {
+      width: min(calc(100% - 1rem), var(--max-width));
+      margin: 0 auto;
+      padding: max(1rem, env(safe-area-inset-top)) 0 max(2rem, env(safe-area-inset-bottom));
+    }
+
+    .hero,
+    .toolbar,
+    .question-card,
+    .final-message {
+      background: var(--panel);
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .hero {
+      padding: 1.1rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    h1 {
+      margin: 0 0 0.6rem;
+      font-size: clamp(1.5rem, 5vw, 2.2rem);
+      line-height: 1.15;
+    }
+
+    .intro {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.98rem;
+    }
+
+    .toolbar {
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.45rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: #09101c;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 0.9rem;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--success));
+      transition: width 250ms ease;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 0.95rem 1rem;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, opacity 120ms ease, background-color 120ms ease;
+      min-height: 48px;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    .btn-secondary {
+      background: #243041;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #2c3b4f;
+    }
+
+    .questions {
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .question-card {
+      padding: 1rem;
+    }
+
+    .question-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.9rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .question-title {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.45;
+    }
+
+    .status-badge {
+      flex: 0 0 auto;
+      width: 2.3rem;
+      height: 2.3rem;
+      border-radius: 999px;
+      border: 2px solid var(--border);
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      background: #0a1220;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .status-badge.pending {
+      color: var(--muted);
+    }
+
+    .status-badge.success {
+      border-color: rgba(34, 197, 94, 0.5);
+      background: rgba(34, 197, 94, 0.16);
+      color: #bbf7d0;
+    }
+
+    .status-badge.error {
+      border-color: rgba(239, 68, 68, 0.5);
+      background: rgba(239, 68, 68, 0.16);
+      color: #fecaca;
+    }
+
+    .question-form {
+      display: grid;
+      gap: 0.65rem;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 0.35rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.7rem;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      min-height: 52px;
+      padding: 0.95rem 1rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #09101c;
+      color: var(--text);
+      font: inherit;
+      outline: none;
+      transition: border-color 120ms ease, box-shadow 120ms ease;
+      font-size: 16px; /* évite le zoom auto sur iPhone */
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18);
+    }
+
+    input[type="text"]:disabled {
+      opacity: 0.8;
+      background: #0d1524;
+    }
+
+    .btn-validate {
+      width: 100%;
+      background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+      color: #07111a;
+    }
+
+    .btn-validate:hover:not(:disabled) {
+      background: linear-gradient(180deg, #67d3fb, #22b5f1);
+    }
+
+    .feedback {
+      min-height: 1.4em;
+      margin: 0;
+      font-size: 0.94rem;
+      color: var(--muted);
+    }
+
+    .feedback.success {
+      color: #86efac;
+    }
+
+    .feedback.error {
+      color: #fca5a5;
+    }
+
+    .final-message {
+      margin-top: 1rem;
+      padding: 1rem;
+      border: 1px solid rgba(250, 204, 21, 0.28);
+      background:
+        linear-gradient(180deg, rgba(250, 204, 21, 0.08), rgba(250, 204, 21, 0.03)),
+        var(--panel);
+      display: none;
+    }
+
+    .final-message.visible {
+      display: block;
+      animation: fadeInUp 300ms ease;
+    }
+
+    .final-title {
+      margin: 0 0 0.5rem;
+      color: #fde68a;
+      font-size: 1.05rem;
+    }
+
+    .final-text {
+      margin: 0;
+      line-height: 1.65;
+      color: var(--text);
+      font-size: 1rem;
+    }
+
+    .gps-block {
+      display: block;
+      margin-top: 0.65rem;
+      padding: 0.8rem;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      border-radius: 12px;
+      font-weight: 700;
+      color: #e5e7eb;
+      word-break: break-word;
+    }
+
+    .footer-note {
+      margin-top: 1rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.55;
+      text-align: center;
+    }
+
+    .visually-hidden {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="hero">
+      <h1>Mission ninja</h1>
+      <p class="intro">
+        Répondez correctement aux 3 énigmes. Chaque bonne réponse validera automatiquement
+        la question correspondante.
+      </p>
+    </section>
+
+    <section class="toolbar" aria-label="Suivi de progression">
+      <div class="progress-label">
+        <span>Progression</span>
+        <span id="progressText">0 / 3 validées</span>
+      </div>
+      <div class="progress-bar" aria-hidden="true">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+
+      <div class="toolbar-actions">
+        <button type="button" class="btn-secondary" id="resetProgressBtn">
+          Réinitialiser
+        </button>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="visually-hidden">Questions</h2>
+      <div class="questions" id="questionsContainer"></div>
+    </section>
+
+    <section class="final-message" id="finalMessage" aria-live="polite">
+      <h2 class="final-title">Mission accomplie</h2>
+      <p class="final-text">
+        Bravo jeune ninja, vous avez réussi votre mission.
+        À présent, retrouvez-nous à cette adresse :
+        <span class="gps-block">
+          12 rue de l’Énigme, 33000 Bordeaux<br>
+          Coordonnées GPS : 44.8378, -0.5792
+        </span>
+      </p>
+    </section>
+
+    <p class="footer-note">
+      La progression est enregistrée sur ce téléphone. En cas de besoin, utilise « Réinitialiser ».
+    </p>
+
+    <div class="visually-hidden" aria-live="polite" id="liveRegion"></div>
+  </main>
+
+  <script>
+    const QUESTIONS = [
+      {
+        id: 1,
+        text: "Question 1 : Qui a volé le parchemin interdit ?",
+        answers: ["Rock Mehdi", "Test"]
+      },
+      {
+        id: 2,
+        text: "Question 2 : Quel poison a été utilisé pour dérober le parchemin ?",
+        answers: ["curare", "Curare", "Test"]
+      },
+      {
+        id: 3,
+        text: "Question 3 : Quel est le mobile du voleur ?",
+        answers: ["Devenir hogokei", "Test"]
+      }
+    ];
+
+    const STORAGE_KEY = "mission-ninja-progress-v1";
+
+    const questionsContainer = document.getElementById("questionsContainer");
+    const progressText = document.getElementById("progressText");
+    const progressBar = document.getElementById("progressBar");
+    const resetProgressBtn = document.getElementById("resetProgressBtn");
+    const liveRegion = document.getElementById("liveRegion");
+    const finalMessage = document.getElementById("finalMessage");
+
+    function normalizeText(value) {
+      return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, " ");
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        return typeof parsed === "object" && parsed !== null ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+
+    function saveState(state) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function getValidatedCount(state) {
+      return QUESTIONS.filter(q => state[q.id]?.validated === true).length;
+    }
+
+    function updateProgress(state) {
+      const validated = getValidatedCount(state);
+      progressText.textContent = `${validated} / ${QUESTIONS.length} validées`;
+      progressBar.style.width = `${(validated / QUESTIONS.length) * 100}%`;
+
+      if (validated === QUESTIONS.length) {
+        finalMessage.classList.add("visible");
+      } else {
+        finalMessage.classList.remove("visible");
+      }
+    }
+
+    function announce(message) {
+      liveRegion.textContent = "";
+      window.setTimeout(() => {
+        liveRegion.textContent = message;
+      }, 50);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function escapeAttribute(value) {
+      return escapeHtml(value);
+    }
+
+    function createQuestionCard(question, state) {
+      const validated = state[question.id]?.validated === true;
+      const savedValue = state[question.id]?.value ?? "";
+
+      const card = document.createElement("article");
+      card.className = "question-card";
+      card.dataset.questionId = question.id;
+
+      card.innerHTML = `
+        <div class="question-head">
+          <h3 class="question-title">${escapeHtml(question.text)}</h3>
+          <div class="status-badge ${validated ? "success" : "pending"}"
+               id="status-${question.id}"
+               aria-label="${validated ? "Réponse validée" : "Réponse en attente"}">
+            ${validated ? "✓" : "•"}
+          </div>
+        </div>
+
+        <form class="question-form" novalidate>
+          <div>
+            <label for="answer-${question.id}">Votre réponse</label>
+            <div class="field-row">
+              <input
+                type="text"
+                id="answer-${question.id}"
+                name="answer-${question.id}"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                value="${escapeAttribute(savedValue)}"
+                ${validated ? "disabled" : ""}
+              >
+              <button
+                type="submit"
+                class="btn-validate"
+                ${validated ? "disabled" : ""}>
+                Valider
+              </button>
+            </div>
+          </div>
+          <p class="feedback ${validated ? "success" : ""}" id="feedback-${question.id}">
+            ${validated ? "Bonne réponse validée." : ""}
+          </p>
+        </form>
+      `;
+
+      const form = card.querySelector("form");
+      const input = card.querySelector("input");
+      const button = card.querySelector("button");
+      const badge = card.querySelector(`#status-${question.id}`);
+      const feedback = card.querySelector(`#feedback-${question.id}`);
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        const userValue = input.value;
+        const normalizedValue = normalizeText(userValue);
+
+        if (!normalizedValue) {
+          badge.className = "status-badge error";
+          badge.textContent = "!";
+          badge.setAttribute("aria-label", "Réponse incorrecte");
+          feedback.className = "feedback error";
+          feedback.textContent = "Merci de saisir une réponse.";
+          announce(`Question ${question.id} : aucune réponse saisie.`);
+          return;
+        }
+
+        const isCorrect = question.answers
+          .map(normalizeText)
+          .includes(normalizedValue);
+
+        const currentState = loadState();
+
+        if (isCorrect) {
+          input.disabled = true;
+          button.disabled = true;
+
+          badge.className = "status-badge success";
+          badge.textContent = "✓";
+          badge.setAttribute("aria-label", "Réponse validée");
+
+          feedback.className = "feedback success";
+          feedback.textContent = "Bonne réponse validée.";
+
+          currentState[question.id] = {
+            validated: true,
+            value: userValue
+          };
+
+          saveState(currentState);
+          updateProgress(currentState);
+          announce(`Question ${question.id} validée.`);
+
+        } else {
+          badge.className = "status-badge error";
+          badge.textContent = "✕";
+          badge.setAttribute("aria-label", "Réponse incorrecte");
+
+          feedback.className = "feedback error";
+          feedback.textContent = "Ce n’est pas la bonne réponse. Réessaie.";
+
+          currentState[question.id] = {
+            validated: false,
+            value: userValue
+          };
+
+          saveState(currentState);
+          updateProgress(currentState);
+          announce(`Question ${question.id} : réponse incorrecte.`);
+        }
+      });
+
+      input.addEventListener("input", () => {
+        if (input.disabled) return;
+
+        const currentState = loadState();
+        currentState[question.id] = {
+          validated: false,
+          value: input.value
+        };
+        saveState(currentState);
+
+        badge.className = "status-badge pending";
+        badge.textContent = "•";
+        badge.setAttribute("aria-label", "Réponse en attente");
+
+        feedback.className = "feedback";
+        feedback.textContent = "";
+      });
+
+      return card;
+    }
+
+    function render() {
+      const state = loadState();
+      questionsContainer.innerHTML = "";
+
+      QUESTIONS.forEach((question) => {
+        questionsContainer.appendChild(createQuestionCard(question, state));
+      });
+
+      updateProgress(state);
+    }
+
+    resetProgressBtn.addEventListener("click", () => {
+      const confirmed = window.confirm("Veux-tu vraiment réinitialiser la progression ?");
+      if (!confirmed) return;
+
+      localStorage.removeItem(STORAGE_KEY);
+      render();
+      announce("Progression réinitialisée.");
+    });
+
+    render();
+  </script>
+</body>
+</html>
