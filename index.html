@@ -31,6 +31,7 @@
     html {
       color-scheme: dark;
       -webkit-text-size-adjust: 100%;
+      scroll-behavior: smooth;
     }
 
     body {
@@ -156,6 +157,10 @@
       padding: 1rem;
     }
 
+    .question-card.locked {
+      opacity: 0.72;
+    }
+
     .question-head {
       display: flex;
       align-items: flex-start;
@@ -200,6 +205,12 @@
       color: #fecaca;
     }
 
+    .status-badge.locked {
+      border-color: rgba(148, 163, 184, 0.28);
+      background: rgba(148, 163, 184, 0.08);
+      color: #94a3b8;
+    }
+
     .question-form {
       display: grid;
       gap: 0.65rem;
@@ -229,7 +240,7 @@
       font: inherit;
       outline: none;
       transition: border-color 120ms ease, box-shadow 120ms ease;
-      font-size: 16px; /* évite le zoom auto sur iPhone */
+      font-size: 16px;
     }
 
     input[type="text"]:focus {
@@ -265,6 +276,10 @@
 
     .feedback.error {
       color: #fca5a5;
+    }
+
+    .feedback.locked {
+      color: #94a3b8;
     }
 
     .final-message {
@@ -344,8 +359,7 @@
     <section class="hero">
       <h1>Mission ninja</h1>
       <p class="intro">
-        Répondez correctement aux 3 énigmes. Chaque bonne réponse validera automatiquement
-        la question correspondante.
+        Répondez correctement aux 3 énigmes. Les questions se débloquent une par une.
       </p>
     </section>
 
@@ -393,22 +407,22 @@
     const QUESTIONS = [
       {
         id: 1,
-        text: "Question 1 : Qui a volé le parchemin interdit ?",
-        answers: ["Rock Mehdi", "Test"]
+        text: "Question 1 : Quel poison a été utilisé pour dérober le parchemin ?",
+        answers: ["curare", "test"]
       },
       {
         id: 2,
-        text: "Question 2 : Quel poison a été utilisé pour dérober le parchemin ?",
-        answers: ["curare", "Curare", "Test"]
+        text: "Question 2 : Quel est le mobile du voleur ?",
+        answers: ["devenir hogokei", "test"]
       },
       {
         id: 3,
-        text: "Question 3 : Quel est le mobile du voleur ?",
-        answers: ["Devenir hogokei", "Test"]
+        text: "Question 3 : Qui a volé le parchemin interdit ?",
+        answers: ["rock mehdi", "test"]
       }
     ];
 
-    const STORAGE_KEY = "mission-ninja-progress-v1";
+    const STORAGE_KEY = "mission-ninja-progress-v3";
 
     const questionsContainer = document.getElementById("questionsContainer");
     const progressText = document.getElementById("progressText");
@@ -439,6 +453,11 @@
 
     function saveState(state) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function isQuestionUnlocked(questionId, state) {
+      if (questionId === 1) return true;
+      return state[questionId - 1]?.validated === true;
     }
 
     function getValidatedCount(state) {
@@ -477,21 +496,52 @@
       return escapeHtml(value);
     }
 
+    function scrollToFinalMessage() {
+      setTimeout(() => {
+        finalMessage.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+      }, 180);
+    }
+
     function createQuestionCard(question, state) {
       const validated = state[question.id]?.validated === true;
       const savedValue = state[question.id]?.value ?? "";
+      const unlocked = isQuestionUnlocked(question.id, state);
+      const disabledBecauseLocked = !validated && !unlocked;
 
       const card = document.createElement("article");
-      card.className = "question-card";
+      card.className = `question-card ${disabledBecauseLocked ? "locked" : ""}`;
       card.dataset.questionId = question.id;
+
+      let badgeClass = "status-badge pending";
+      let badgeText = "🥷";
+      let badgeLabel = "Réponse en attente";
+      let feedbackText = "";
+      let feedbackClass = "feedback";
+
+      if (validated) {
+        badgeClass = "status-badge success";
+        badgeText = "✓";
+        badgeLabel = "Réponse validée";
+        feedbackClass = "feedback success";
+        feedbackText = "Bonne réponse validée.";
+      } else if (disabledBecauseLocked) {
+        badgeClass = "status-badge locked";
+        badgeText = "🔒";
+        badgeLabel = "Question verrouillée";
+        feedbackClass = "feedback locked";
+        feedbackText = "Valide d’abord la question précédente.";
+      }
 
       card.innerHTML = `
         <div class="question-head">
           <h3 class="question-title">${escapeHtml(question.text)}</h3>
-          <div class="status-badge ${validated ? "success" : "pending"}"
+          <div class="${badgeClass}"
                id="status-${question.id}"
-               aria-label="${validated ? "Réponse validée" : "Réponse en attente"}">
-            ${validated ? "✓" : "•"}
+               aria-label="${badgeLabel}">
+            ${badgeText}
           </div>
         </div>
 
@@ -507,30 +557,36 @@
                 autocapitalize="off"
                 spellcheck="false"
                 value="${escapeAttribute(savedValue)}"
-                ${validated ? "disabled" : ""}
+                ${validated || disabledBecauseLocked ? "disabled" : ""}
               >
               <button
                 type="submit"
                 class="btn-validate"
-                ${validated ? "disabled" : ""}>
+                ${validated || disabledBecauseLocked ? "disabled" : ""}>
                 Valider
               </button>
             </div>
           </div>
-          <p class="feedback ${validated ? "success" : ""}" id="feedback-${question.id}">
-            ${validated ? "Bonne réponse validée." : ""}
+          <p class="${feedbackClass}" id="feedback-${question.id}">
+            ${feedbackText}
           </p>
         </form>
       `;
 
       const form = card.querySelector("form");
       const input = card.querySelector("input");
-      const button = card.querySelector("button");
       const badge = card.querySelector(`#status-${question.id}`);
       const feedback = card.querySelector(`#feedback-${question.id}`);
 
       form.addEventListener("submit", (event) => {
         event.preventDefault();
+
+        const currentState = loadState();
+
+        if (!isQuestionUnlocked(question.id, currentState) && !currentState[question.id]?.validated) {
+          announce(`Question ${question.id} verrouillée.`);
+          return;
+        }
 
         const userValue = input.value;
         const normalizedValue = normalizeText(userValue);
@@ -549,29 +605,27 @@
           .map(normalizeText)
           .includes(normalizedValue);
 
-        const currentState = loadState();
-
         if (isCorrect) {
-          input.disabled = true;
-          button.disabled = true;
-
-          badge.className = "status-badge success";
-          badge.textContent = "✓";
-          badge.setAttribute("aria-label", "Réponse validée");
-
-          feedback.className = "feedback success";
-          feedback.textContent = "Bonne réponse validée.";
-
           currentState[question.id] = {
             validated: true,
             value: userValue
           };
 
           saveState(currentState);
-          updateProgress(currentState);
+          render();
           announce(`Question ${question.id} validée.`);
 
+          if (getValidatedCount(currentState) === QUESTIONS.length) {
+            scrollToFinalMessage();
+          }
         } else {
+          currentState[question.id] = {
+            validated: false,
+            value: userValue
+          };
+
+          saveState(currentState);
+
           badge.className = "status-badge error";
           badge.textContent = "✕";
           badge.setAttribute("aria-label", "Réponse incorrecte");
@@ -579,12 +633,6 @@
           feedback.className = "feedback error";
           feedback.textContent = "Ce n’est pas la bonne réponse. Réessaie.";
 
-          currentState[question.id] = {
-            validated: false,
-            value: userValue
-          };
-
-          saveState(currentState);
           updateProgress(currentState);
           announce(`Question ${question.id} : réponse incorrecte.`);
         }
@@ -601,7 +649,7 @@
         saveState(currentState);
 
         badge.className = "status-badge pending";
-        badge.textContent = "•";
+        badge.textContent = "🥷";
         badge.setAttribute("aria-label", "Réponse en attente");
 
         feedback.className = "feedback";
